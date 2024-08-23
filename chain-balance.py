@@ -42,19 +42,30 @@ def get_onchain_balance(identifier, id_type, network):
     # Extract and sum the balances
     for asset in data.get("assets", []):
         asset_id = asset.get("asset_genesis", {}).get("asset_id")
-        asset_group = asset.get("asset_group", {})
-        raw_group_key = asset_group.get("raw_group_key")
-        tweaked_group_key = asset_group.get("tweaked_group_key")
         script_key_is_local = asset.get("script_key_is_local", False)
+        asset_group = asset.get("asset_group", {})
 
-        # Check if the asset matches the identifier (either by asset_id, raw_group_key, or tweaked_group_key)
-        if script_key_is_local and (
-            asset_id == identifier
-            or raw_group_key == identifier
-            or tweaked_group_key == identifier
+        # Ensure asset_group is not None
+        if asset_group:
+            raw_group_key = asset_group.get("raw_group_key")
+            tweaked_group_key = asset_group.get("tweaked_group_key")
+        else:
+            raw_group_key = None
+            tweaked_group_key = None
+
+        # If identifier is an asset ID, check for asset ID match
+        if id_type == "asset_id" and asset_id == identifier:
+            if script_key_is_local:
+                amount = int(asset.get("amount", 0))
+                total_balance += amount
+
+        # If identifier is a group key, check for raw or tweaked group key match
+        elif id_type == "group_key" and (
+            raw_group_key == identifier or tweaked_group_key == identifier
         ):
-            amount = int(asset.get("amount", 0))
-            total_balance += amount
+            if script_key_is_local:
+                amount = int(asset.get("amount", 0))
+                total_balance += amount
 
     if total_balance > 0:
         print(f"Found on-chain balance")
@@ -186,9 +197,7 @@ total_off_chain_remote_balance = 0
 
 # Iterate over each asset ID and accumulate balances
 simple_balance = 0
-for asset_id in asset_ids:
-    # Process simple balance
-    simple_balance += get_onchain_balance(asset_id, id_type, network)
+simple_balance += get_onchain_balance(identifier, id_type, network)
 
 # Process off-chain balances for either a single asset ID or multiple asset IDs
 total_capacity, total_local_balance, total_remote_balance = get_off_chain_balances(
